@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <title>covid sim</title>
+    <script>
+        var transmissionRate = 0.1;
+        var recoveryRate = 0.95;
+        var recoveryPeriod = 3;
+        var tick;
+        var tickDelay = 100;
+        var startingPercent = 10;
+        var vaccinationRate = 20;
+        var vaccineImmunity = 95;
+        var safe = 0;
+        var vaccinated = 0;
+        var origvaxxed = 0;
+        var infected = 0;
+        var recovered = 0;
+        var dead = 0;
+        var pause = false;
+        var reset = false;
+        var executing = false;
+        function resetSim(){
+            clearTimeout(tick);
+            safe = 0;
+            vaccinated = 0;
+            origvaxxed = 0;
+            infected = 0;
+            recovered = 0;
+            dead = 0;
+            pause = false;
+            reset = false;
+            executing = false;
+            grid = [];
+            reset = executing;
+
+            document.getElementById("result").innerText = "";
+            document.getElementById("result-close-btn-control").checked = false;
+            document.getElementById("result-popup").style.visibility = "hidden";
+
+            constructGrid();
+            randomizeInfectedAndVaxxed();
+        }
+    </script>
+    <style>
+        html{
+            overflow: hidden;
+
+        }
+        *{
+            position: relative;
+            font-family: "Lucida Console", "Lucida Sans";
+        }
+
+        p,h3{
+            white-space: pre;
+            display: inline;
+        }
+        span{
+            border: 1px solid black;
+            padding: .3vh .3vw;
+            display: inline-block;
+        }
+        #noncanvas{
+          float: left;
+          margin-top: -105vh;
+        }
+        #restitle{
+            font-size: 5vmin;
+            font-weight: bold;
+            visibility: hidden;
+        }
+        .result{
+            z-index: -1;
+            float: right;
+            font-size: 2vmin;
+            display: block;
+            float: top;
+            text-align: center;
+        }
+        button{
+            width: 10.25vw;
+            height: 6vh;
+            display: block;
+            border: 2px solid black;
+            font-size: 2vmin;
+            padding: .6vh .3687vw;
+            z-index: 1000;
+        }
+        canvas{
+            border: 1px solid black;
+            border-style: solid none none solid;
+        }
+        #startbutton{
+            background-color: rgb(28, 235, 49);
+        }
+        #pausebutton{
+            background-color: yellow;
+        }
+        #resetbutton{
+            background-color: rgb(255, 0, 0);
+        }
+        button:hover{
+            border: 2px solid gold !important;
+        }
+        #result-popup{
+            position: absolute;
+            border-radius: 1vw;
+            top: 45%;
+            left: 50%;
+            padding: 1.5vh 1.5vw;
+            transform: translate(-50%, -50%);
+            color: white;
+            background-color: black;
+            z-index: 10000;
+            visibility: hidden;
+            text-align: center;
+        }
+        #result-popup-greyout{
+            position: absolute;
+            top: -1000%;
+            left: -1000%;
+            width: 10000vw;
+            height: 1000vw;
+            background-color: black;
+            opacity: .6;
+        }
+        #result-close-btn {
+            position: fixed;
+            top: 0;
+            right: 0;
+            font-size: 4vmin;
+            font-weight: bold;
+            color: #fff;
+            border-radius: 25%;
+        }
+        #result-close-btn-control{
+            position: fixed;
+            width: 4vmin;
+            height: 4vmin;
+            z-index: 105000;
+            top: 0;
+            right: 0;
+            opacity: 0;
+        }
+        #result-close-btn-control:checked + label > #result-close-btn{
+           display: none;
+        }
+
+
+    </style>
+    <body>
+        <canvas id="canvas" width="800" height="800"></canvas>
+        
+        <div id="noncanvas">
+            <span class = "transrate">
+                <p>Transmission Rate:</p>
+                <p id="transratetext">0.10</p>
+                <br>
+                <input type="range" id="transrateslider" value=".1" min=".01" max=".99" step="0.01"></input>
+            </span>
+            <br><br>
+
+            <span class="recoveryrate">
+                <p>Recovery Rate:</p>
+                <p id="recoveryratetext">0.95</p>
+                <br>
+                <input type="range" id="recoveryrateslider" value=".95" min=".01" max=".99" step="0.01"></input>
+            </span>
+            <br><br>
+
+            <span class="recoveryperiod">
+                <p>Recovery Period:</p>
+                <p id="recoveryperiodtext">3&nbsp;</p>
+                <br>
+                <input type="range" id="recoveryperiodslider" value="3" min="1" max="28" step="1"></input>
+            </span>
+            <br><br>
+
+
+
+            <span class="startingpercent">
+                <p>% Starting Infected: </p>
+                <p id="startingpercenttext">10</p>
+                <br>
+                <input type="range" id="startingpercentslider" value="10" min=".1" max="100" step=".1"></input>
+            </span>
+            <br><br>
+
+
+            <span class="vaccinationrate">
+                <p>% Vaccination Rate:</p>
+                <p id="vaccinationratetext">20</p>
+                <br>
+                <input type="range" id="vaccinationrateslider" value="20" min="0" max="100" step=".1"></input>
+            </span>
+            <br><br>
+
+            <span class="vaccineimmunity">
+                <p>% Coverage From Vaccine:</p>
+                <p id="vaccineimmunitytext">95</p>
+                <br>
+                <input type="range" id="vaccineimmunityslider" value="95" min="20" max="100" step="1"></input>
+            </span>
+            <br><br>
+
+            <span class="tickdelay">
+                <p>Tick Delay (ms):</p>
+                <p id="tickdelaytext">100&nbsp;</p>
+                <br>
+                <input type="range" id="tickdelayslider" value="100" min="1" max="300" step="1"></input>
+            </span>
+            <br><br>
+            <button id="startbutton" onclick="Main()">Start</button>
+            <br>
+            <button id="pausebutton" onclick="pause=!pause; document.getElementById('pausebutton').innerText = pause ? 'Play' : 'Pause'; if(!pause) executeEvents(); ">Pause</button>
+            <br>
+            <button id="resetbutton" onclick="resetSim()">Reset</button>
+
+
+
+        </div>
+        <br><br>
+        <div id="result-popup">
+            <input type="checkbox" id="result-close-btn-control"/>
+            <label class="btn" for="result-close-btn-control">
+                <span id="result-close-btn">&times;</span>
+            </label>
+            <div id="result-popup-greyout"></div>
+            <h3>RESULTS:</h3>
+            <p id="result"></p>
+        </div>
+        <br><br>
+        
+
+        <script>
+            
+            var canvas = document.getElementById("canvas");
+            var ctx = canvas.getContext("2d");
+            var grid = [];
+
+            canvas.width = window.innerWidth * 0.52;
+            canvas.width = canvas.width - (canvas.width % 100) + 100;
+
+            canvas.height = window.innerHeight * .96;
+            canvas.height = canvas.height - (canvas.height % 100) + 100;
+            
+            document.getElementById("noncanvas").style.setProperty("margin-left", canvas.width*1.1 + "px")
+
+
+
+            ////////
+            document.getElementById("transrateslider").oninput = function() {
+                document.getElementById("transratetext").innerText = this.value.padEnd(4,0);
+                transmissionRate = this.value;
+            }
+            document.getElementById("recoveryrateslider").oninput = function() {
+                document.getElementById("recoveryratetext").innerText = this.value.padEnd(4,0);
+                recoveryRate = this.value;
+            }
+            document.getElementById("recoveryperiodslider").oninput = function() {
+                document.getElementById("recoveryperiodtext").innerText = this.value.padEnd(2);
+                recoveryPeriod = this.value;
+            }
+            document.getElementById("startingpercentslider").oninput = function() {
+                document.getElementById("vaccinationrateslider").max = 100 - this.value;
+                document.getElementById("startingpercenttext").innerText = this.value.padEnd(4);
+                startingPercent = this.value;
+            }
+            document.getElementById("vaccinationrateslider").oninput = function(){
+                document.getElementById("startingpercentslider").max = 100 - this.value;
+                document.getElementById("vaccinationratetext").innerText = this.value.padEnd(3);
+                vaccinationRate = this.value;
+            }
+            document.getElementById("vaccineimmunityslider").oninput = function(){
+                document.getElementById("vaccineimmunitytext").innerText = this.value.padEnd(3);
+                vaccineImmunity = this.value;
+            }
+            document.getElementById("tickdelayslider").oninput = function() {
+                document.getElementById("tickdelaytext").innerText = this.value.padEnd(4);
+                tickDelay = this.value;
+            }
+            
+
+            document.getElementById("transrateslider").oninput();
+            document.getElementById("recoveryrateslider").oninput();
+            document.getElementById("recoveryperiodslider").oninput();
+            document.getElementById("startingpercentslider").oninput();
+            document.getElementById("vaccinationrateslider").oninput();
+            document.getElementById("vaccineimmunityslider").oninput();
+            document.getElementById("tickdelayslider").oninput();
+
+            document.addEventListener("click", function(){
+                if(document.getElementById("result-close-btn-control").checked && document.getElementById("result-popup").style.visibility != "hidden"){
+                    document.getElementById("result-popup").style.visibility = "hidden";
+                }
+            });
+
+            
+            ///////
+
+
+            const cellStatus =  {
+                susceptible: 0,
+                infected: 1,
+                recovered: 2,
+                dead: 3,
+                vaccinated: 4
+            };
+            Object.freeze(cellStatus);
+
+            class Cell{
+                static width = 9;
+                static height = 9;
+                static distx = Cell.width +1;
+                static disty = Cell.height +1;
+                constructor(x, y, pos){
+                    this.roundsInfected = 0;
+                    this.pos = pos;
+                    this.x = x;
+                    this.y = y;
+                    this.status = cellStatus.susceptible;
+                    this.newlyInfected = false; 
+                    this.draw();
+                }
+                draw(){
+                    switch(this.status){
+                        case cellStatus.susceptible:
+                            ctx.fillStyle = "rgb(28, 235, 49)"; //green
+                            break;
+                        case cellStatus.infected:
+                            ctx.fillStyle = "rgb(219, 0, 0)"; //red
+                            break;
+                        case cellStatus.recovered:
+                            ctx.fillStyle = "rgb(66, 64, 64)"; //grey
+                            break;
+                        case cellStatus.dead:
+                            ctx.fillStyle = "rgb(0, 0, 0)"; //black
+                            break;
+                        case cellStatus.vaccinated:
+                            ctx.fillStyle = "rgb(50, 113, 168)"; //blue
+                            break;
+                    }
+                    ctx.fillRect(this.x, this.y, Cell.width, Cell.height);
+                }
+            }
+
+
+            function constructGrid(){
+                grid = [];
+                ctx.fillStyle = "rgb(0, 0, 0)";
+                ctx.fillRect(0, 0, canvas.width, canvas.width);
+                for(var y = 0; y < canvas.width; y += Cell.distx){
+                    for(var x = 0; x < canvas.width; x += Cell.disty){
+                        grid.push(new Cell(x, y, grid.length));
+                    }
+                }
+                safe = grid.length;
+            }
+
+            function randomizeInfectedAndVaxxed(){
+                infected = 0;
+                vaccinated = 0;
+
+                var infectedNum = Math.floor(startingPercent/100 * grid.length);
+                var vaccinatedNum = Math.floor(vaccinationRate/100 * grid.length);
+                var i = 0;
+                while(infectedNum > 0){
+                    do{
+                        i = Math.floor(Math.random() * grid.length);
+                    } while(grid[i].status != cellStatus.susceptible);
+
+                    if(Math.floor(Math.random()*100) < 16 && infectedNum > 0){
+                        grid[i].status = cellStatus.infected;
+                        grid[i].draw();
+                        infectedNum--;
+                        ++infected;
+                        --safe;
+                    }
+                }
+                while(vaccinatedNum > 0){
+                    do{
+                        i = Math.floor(Math.random() * grid.length);
+                    } while(grid[i].status != cellStatus.susceptible);
+
+                    if(Math.floor(Math.random()*100) < 16 && vaccinatedNum > 0){
+                        grid[i].status = cellStatus.vaccinated;
+                        grid[i].draw();
+                        vaccinatedNum--;
+                        ++vaccinated;
+                    }
+                }
+                origvaxxed = vaccinated;
+            }
+
+            function mapOnAllCells(lambda){ // costly
+                for(var i = 0; i < grid.length; i++){
+                    lambda(grid[i]);
+                }
+            }
+
+            function redrawCells(){ 
+                ctx.fillStyle = "rgb(0, 0, 0)";
+                ctx.fillRect(0, 0, canvas.width, canvas.width);
+                mapOnAllCells(function(cell){
+                    cell.draw();
+                });
+            }
+
+            function getNeighbors(cell){
+                var neighbors = [];
+                const x = cell.x;
+                const y = cell.y;
+                for(var i = Math.max(0, cell.pos-(canvas.width/Cell.distx)-1); i < Math.min(grid.length, cell.pos+1+(canvas.width*2/Cell.distx)); i++){
+                    gridcell = grid[i];
+                    if(gridcell.x == x && gridcell.y == y){
+                        continue;
+                    }
+                    if(gridcell.x == x-Cell.distx || gridcell.x == x+Cell.distx || gridcell.x == x){
+                        if(gridcell.y == y-Cell.disty || gridcell.y == y+Cell.disty || gridcell.y == y){
+                            neighbors.push(gridcell);
+                        }
+                    }
+                }
+                return neighbors;
+            }
+
+            function manageStatus(){
+                redrawCells();
+                mapOnAllCells(function(cell){
+                    if(cell.status != cellStatus.infected) return;
+                    if(cell.newlyInfected){
+                        --safe;
+                        cell.newlyInfected = false;
+                        return;
+                    }
+                    if(++cell.roundsInfected >= recoveryPeriod){
+                        --infected;
+                        cell.status = Math.random() < recoveryRate ? cellStatus.recovered : cellStatus.dead;
+                        if(cell.status == cellStatus.dead){
+                            ++dead;
+                        }
+                        else ++recovered;
+                    }
+                    var neighbors = getNeighbors(cell);
+                    for(var i in neighbors){
+                        var neighbor = neighbors[i];
+                        if((neighbor.status == cellStatus.susceptible || neighbor.status == cellStatus.vaccinated) && (Math.random() < transmissionRate)){
+                            if(neighbor.status == cellStatus.susceptible || Math.random() > vaccineImmunity/100){
+                                if(neighbor.status == cellStatus.vaccinated){
+                                    --vaccinated;
+                                }
+                                grid[neighbor.pos].status = cellStatus.infected;
+                                grid[neighbor.pos].newlyInfected = true;
+                                ++infected;
+                            }
+                        }
+                    }
+
+                });
+            }
+
+
+            
+
+
+
+
+            function executeEvents(){
+                executing = true;
+                manageStatus();
+                if((infected <= 0)){
+                    manageStatus();
+                    executing = false;
+                    document.getElementById("result").innerText = 
+                        `\n${safe} safe (${(safe/grid.length*100).toFixed(2)}%)\n${recovered} recovered (${(recovered/grid.length*100).toFixed(2)}%)\n${dead} dead (${(dead/grid.length*100).toFixed(2)}%)\n`+(origvaxxed > 0 ? `${origvaxxed - vaccinated} vaccinated but still infected (${((origvaxxed - vaccinated)/origvaxxed*100).toFixed(2)}%)` : ``);
+                    document.getElementById("result-popup").style.visibility = "visible";
+                    return;
+                }
+                if(pause) {executing = false; return;}
+                if(reset){
+                    executing = false;
+                    reset = false;
+                    return;
+                }
+                tick = setTimeout( () => {
+                    window.requestAnimationFrame(() => executeEvents());
+                }, tickDelay);
+                executing = false;
+            }
+            function Main(){    
+
+                resetSim();           
+                executeEvents();
+            }
+            constructGrid();
+            randomizeInfectedAndVaxxed(); 
+            
+
+
+
+        </script>
+    </body>
+</html>
